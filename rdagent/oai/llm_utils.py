@@ -373,8 +373,8 @@ class APIBackend:
                         azure_endpoint=self.embedding_api_base,
                     )
             else:
-                self.chat_client = openai.OpenAI(api_key=self.chat_api_key,base_url='https://api.openai.com/v1')
-                self.embedding_client = openai.OpenAI(api_key=self.embedding_api_key,base_url='https://api.openai.com/v1')
+                self.chat_client = openai.OpenAI(api_key=self.chat_api_key,base_url='https://api.gptapi.us/v1')
+                self.embedding_client = openai.OpenAI(api_key=self.embedding_api_key,base_url='https://api.gptapi.us/v1')
 
         self.dump_chat_cache = self.cfg.dump_chat_cache if dump_chat_cache is None else dump_chat_cache
         self.use_chat_cache = self.cfg.use_chat_cache if use_chat_cache is None else use_chat_cache
@@ -581,7 +581,16 @@ class APIBackend:
     def clean_and_parse_json(self, response):
         # 去除 ```json 和 ``` 这些标记
         cleaned_response = response.strip('```json').strip('```').strip()
-        return cleaned_response
+         # 找到第一个 "{" 和最后一个 "}"
+        start_index = cleaned_response.find('{')
+        end_index = cleaned_response.rfind('}') + 1  # 找到最后一个 "}" 并加1包含它
+
+        if start_index != -1 and end_index != -1:
+            # 提取从第一个 "{" 到最后一个 "}" 之间的内容
+            return cleaned_response[start_index:end_index]
+        else:
+            # 如果没找到有效的 "{" 或 "}"，返回原始字符串
+            return cleaned_response
     
     def _create_chat_completion_inner_function(  # noqa: C901, PLR0912, PLR0915
         self,
@@ -705,8 +714,12 @@ class APIBackend:
                 if self.cfg.log_llm_chat_content:
                     logger.info(f"{LogColors.CYAN}Response:{resp}{LogColors.END}", tag="llm_messages")
             if json_mode:
-                # resp = self.clean_and_parse_json(resp)
-                json.loads(resp)  # 解析并赋值给 resp
+                # 
+                try:
+                    json.loads(resp)  # 解析并赋值给 resp
+                except:
+                    resp = self.clean_and_parse_json(resp)
+
 
         if self.dump_chat_cache:
             self.cache.chat_set(input_content_json, resp)
