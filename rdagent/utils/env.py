@@ -208,11 +208,10 @@ class DockerEnv(Env[DockerConf]):
             with Progress(SpinnerColumn(), TextColumn("{task.description}")) as p:
                 task = p.add_task("[cyan]Building image...")
                 for part in resp_stream:
-                    # print(f"Part to be parsed: {part}")
-                    parts = part.decode("utf-8").split("\r\n")
-                    for part in parts:
-                        if part.strip():
-                            status_dict = json.loads(part)
+                    lines = part.decode("utf-8").split("\r\n")
+                    for line in lines:
+                        if line.strip():
+                            status_dict = json.loads(line)
                             if "error" in status_dict:
                                 p.update(task, description=f"[red]error: {status_dict['error']}")
                                 raise docker.errors.BuildError(status_dict["error"], "")

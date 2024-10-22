@@ -22,6 +22,7 @@ from rdagent.core.evolving_framework import EvolvingStrategy, QueriedKnowledge
 from rdagent.core.experiment import Workspace
 from rdagent.core.prompts import Prompts
 from rdagent.core.utils import multiprocessing_wrapper
+from rdagent.oai.llm_conf import LLM_SETTINGS
 from rdagent.oai.llm_utils import APIBackend
 
 if TYPE_CHECKING:
@@ -160,7 +161,7 @@ class FactorEvolvingStrategy(MultiProcessEvolvingStrategy):
                     session.build_chat_completion_message_and_calculate_token(
                         user_prompt,
                     )
-                    < RD_AGENT_SETTINGS.chat_token_limit
+                    < LLM_SETTINGS.chat_token_limit
                 ):
                     break
                 elif len(queried_former_failed_knowledge_to_render) > 1:
@@ -216,10 +217,16 @@ class FactorEvolvingStrategyWithGraph(MultiProcessEvolvingStrategy):
             )  # A dict, {{error_type:[[error_imp_knowledge, success_imp_knowledge],...]},...}
 
             queried_former_failed_knowledge = (
-                queried_knowledge.former_traces[target_factor_task_information] if queried_knowledge is not None else []
+                queried_knowledge.former_traces[target_factor_task_information][0]
+                if queried_knowledge is not None
+                else []
             )
 
             queried_former_failed_knowledge_to_render = queried_former_failed_knowledge
+
+            latest_attempt_to_latest_successful_execution = queried_knowledge.former_traces[
+                target_factor_task_information
+            ][1]
 
             system_prompt = (
                 Environment(undefined=StrictUndefined)
@@ -275,7 +282,7 @@ class FactorEvolvingStrategyWithGraph(MultiProcessEvolvingStrategy):
                         )
                         if (
                             session_summary.build_chat_completion_message_and_calculate_token(error_summary_user_prompt)
-                            < RD_AGENT_SETTINGS.chat_token_limit
+                            < LLM_SETTINGS.chat_token_limit
                         ):
                             break
                         elif len(queried_similar_error_knowledge_to_render) > 0:
@@ -296,6 +303,7 @@ class FactorEvolvingStrategyWithGraph(MultiProcessEvolvingStrategy):
                         queried_similar_error_knowledge=queried_similar_error_knowledge_to_render,
                         error_summary=error_summary,
                         error_summary_critics=error_summary_critics,
+                        latest_attempt_to_latest_successful_execution=latest_attempt_to_latest_successful_execution,
                     )
                     .strip("\n")
                 )
@@ -303,7 +311,7 @@ class FactorEvolvingStrategyWithGraph(MultiProcessEvolvingStrategy):
                     session.build_chat_completion_message_and_calculate_token(
                         user_prompt,
                     )
-                    < RD_AGENT_SETTINGS.chat_token_limit
+                    < LLM_SETTINGS.chat_token_limit
                 ):
                     break
                 elif len(queried_former_failed_knowledge_to_render) > 1:

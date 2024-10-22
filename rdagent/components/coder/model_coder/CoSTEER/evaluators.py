@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import List, Tuple
 
 import numpy as np
-import torch
 from jinja2 import Environment, StrictUndefined
 
 from rdagent.components.coder.model_coder.conf import MODEL_IMPL_SETTINGS
@@ -19,12 +18,13 @@ from rdagent.core.experiment import Task, Workspace
 from rdagent.core.prompts import Prompts
 from rdagent.core.utils import multiprocessing_wrapper
 from rdagent.log import rdagent_logger as logger
+from rdagent.oai.llm_conf import LLM_SETTINGS
 from rdagent.oai.llm_utils import APIBackend
 
 evaluate_prompts = Prompts(file_path=Path(__file__).parent.parent / "prompts.yaml")
 
 
-def shape_evaluator(prediction: torch.Tensor | np.ndarray, target_shape: Tuple = None) -> Tuple[str, bool]:
+def shape_evaluator(prediction: np.ndarray, target_shape: Tuple = None) -> Tuple[str, bool]:
     if target_shape is None or prediction is None:
         return (
             "No output generated from the model. No shape evaluation conducted.",
@@ -41,18 +41,10 @@ def shape_evaluator(prediction: torch.Tensor | np.ndarray, target_shape: Tuple =
         )
 
 
-def reshape_tensor(original_tensor, target_shape):
-    new_tensor = torch.zeros(target_shape)
-    for i, dim in enumerate(original_tensor.shape):
-        new_tensor = new_tensor.narrow(i, 0, dim).copy_(original_tensor)
-
-    return new_tensor
-
-
 def value_evaluator(
-    prediction: torch.Tensor,
-    target: torch.Tensor,
-) -> Tuple[torch.Tensor, bool]:
+    prediction: np.ndarray,
+    target: np.ndarray,
+) -> Tuple[np.ndarray, bool]:
     if prediction is None:
         return "No output generated from the model. Skip value evaluation", False
     elif target is None:
@@ -62,7 +54,7 @@ def value_evaluator(
         )
     else:
         # Calculate the mean absolute difference
-        diff = torch.mean(torch.abs(target - prediction)).item()
+        diff = np.mean(np.abs(target - prediction))
         return (
             f"The value of the output is correct. The mean absolute difference is {diff}.",
             diff < 0.1,
@@ -90,9 +82,11 @@ class ModelCodeEvaluator(Evaluator):
             Environment(undefined=StrictUndefined)
             .from_string(evaluate_prompts["evaluator_code_feedback"]["system"])
             .render(
-                scenario=self.scen.get_scenario_all_desc(target_task)
-                if self.scen is not None
-                else "No scenario description."
+                scenario=(
+                    self.scen.get_scenario_all_desc(target_task)
+                    if self.scen is not None
+                    else "No scenario description."
+                )
             )
         )
 
@@ -116,7 +110,7 @@ class ModelCodeEvaluator(Evaluator):
                     user_prompt=user_prompt,
                     system_prompt=system_prompt,
                 )
-                > RD_AGENT_SETTINGS.chat_token_limit
+                > LLM_SETTINGS.chat_token_limit
             ):
                 execution_feedback_to_render = execution_feedback_to_render[len(execution_feedback_to_render) // 2 :]
             else:
@@ -150,9 +144,11 @@ class ModelFinalEvaluator(Evaluator):
             Environment(undefined=StrictUndefined)
             .from_string(evaluate_prompts["evaluator_final_feedback"]["system"])
             .render(
-                scenario=self.scen.get_scenario_all_desc(target_task)
-                if self.scen is not None
-                else "No scenario description."
+                scenario=(
+                    self.scen.get_scenario_all_desc(target_task)
+                    if self.scen is not None
+                    else "No scenario description."
+                )
             )
         )
 
@@ -176,7 +172,7 @@ class ModelFinalEvaluator(Evaluator):
                     user_prompt=user_prompt,
                     system_prompt=system_prompt,
                 )
-                > RD_AGENT_SETTINGS.chat_token_limit
+                > LLM_SETTINGS.chat_token_limit
             ):
                 execution_feedback_to_render = execution_feedback_to_render[len(execution_feedback_to_render) // 2 :]
             else:
@@ -268,7 +264,7 @@ class ModelCoderEvaluator(Evaluator):
         param_init_value = 0.6
 
         assert isinstance(implementation, ModelFBWorkspace)
-        model_execution_feedback, gen_tensor = implementation.execute(
+        model_execution_feedback, gen_np_array = implementation.execute(
             batch_size=batch_size,
             num_features=num_features,
             num_timesteps=num_timesteps,
@@ -277,7 +273,7 @@ class ModelCoderEvaluator(Evaluator):
         )
         if gt_implementation is not None:
             assert isinstance(gt_implementation, ModelFBWorkspace)
-            _, gt_tensor = gt_implementation.execute(
+            _, gt_np_array = gt_implementation.execute(
                 batch_size=batch_size,
                 num_features=num_features,
                 num_timesteps=num_timesteps,
@@ -285,10 +281,10 @@ class ModelCoderEvaluator(Evaluator):
                 param_init_value=param_init_value,
             )
         else:
-            gt_tensor = None
+            gt_np_array = None
 
-        shape_feedback, shape_decision = shape_evaluator(gen_tensor, (batch_size, 1))
-        value_feedback, value_decision = value_evaluator(gen_tensor, gt_tensor)
+        shape_feedback, shape_decision = shape_evaluator(gen_np_array, (batch_size, 1))
+        value_feedback, value_decision = value_evaluator(gen_np_array, gt_np_array)
         code_feedback, _ = ModelCodeEvaluator(scen=self.scen).evaluate(
             target_task=target_task,
             implementation=implementation,

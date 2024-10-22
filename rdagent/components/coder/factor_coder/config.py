@@ -20,12 +20,6 @@ class FactorImplementSettings(BaseSettings):
     data_folder_debug: str = "git_ignore_folder/factor_implementation_source_data_debug"
     """Path to the folder containing partial financial data (for debugging)"""
 
-    cache_location: str = "git_ignore_folder/factor_implementation_execution_cache"
-    """Path to the cache location"""
-
-    enable_execution_cache: bool = True
-    """Indicates whether to enable the execution cache"""
-
     # TODO: the factor implement specific settings should not appear in this settings
     # Evolving should have a method specific settings
     # evolving related config
@@ -37,6 +31,7 @@ class FactorImplementSettings(BaseSettings):
     v2_query_component_limit: int = 1
     v2_query_error_limit: int = 1
     v2_query_former_trace_limit: int = 1
+    v2_add_fail_attempt_to_latest_successful_execution: bool = False
     v2_error_summary: bool = False
     v2_knowledge_sampler: float = 1.0
 
