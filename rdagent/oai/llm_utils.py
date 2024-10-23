@@ -587,8 +587,16 @@ class APIBackend:
         end_index = cleaned_response.rfind('}') + 1  # 找到最后一个 "}" 并加1包含它
 
         if start_index != -1 and end_index != -1:
-            # 提取从第一个 "{" 到最后一个 "}" 之间的内容
-            return cleaned_response[start_index:end_index]
+            json_content = cleaned_response[start_index:end_index]
+
+            # 替换 R"$$ ... $$" 这种公式表示法为普通的 JSON 格式
+            # 正则表达式匹配公式块
+            json_content = re.sub(r'R"\$\$ (.*?) \$\$"', r'"\1"', json_content)
+
+            # 替换 LaTeX 特殊字符的转义
+            json_content = json_content.replace('\\', '\\\\')
+
+            return json_content
         else:
             # 如果没找到有效的 "{" 或 "}"，返回原始字符串
             return cleaned_response
