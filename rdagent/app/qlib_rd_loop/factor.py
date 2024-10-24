@@ -11,7 +11,7 @@ from rdagent.components.workflow.rd_loop import RDLoop
 from rdagent.core.exception import FactorEmptyError
 from rdagent.log import rdagent_logger as logger
 from rdagent.log.time import measure_time
-
+from dotenv import load_dotenv
 
 class FactorRDLoop(RDLoop):
     skip_loop_error = (FactorEmptyError,)
@@ -46,4 +46,5 @@ def main(path=None, step_n=None):
 
 
 if __name__ == "__main__":
+    load_dotenv(verbose=True)
     fire.Fire(main)
